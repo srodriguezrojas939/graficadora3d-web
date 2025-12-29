@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Graficadora 3D Sólida - Raiz Cuadrada</title>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/10.6.4/math.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600&display=swap');
+
+        .fade-in { opacity: 0; transform: translateY(25px); animation: fadeUp 0.9s ease forwards; }
+        @keyframes fadeUp { to { opacity: 1; transform: translateY(0); } }
+
+        body { background: white; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; }
+
+        .calculadora-moderna {
+            max-width: 700px; width: 100%; padding: 40px 30px;
+            background: #F2F2F2; border-radius: 35px;
+            font-family: 'Open Sans', sans-serif; box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+            box-sizing: border-box;
+        }
+
+        .header-section { text-align: center; margin-bottom: 25px; }
+        .header-section h1 { font-size: 32px; margin: 0; font-family: 'Playfair Display', serif; }
+        .header-section p { font-size: 18px; font-weight: 600; color: #333; font-family: 'Playfair Display', serif; margin: 5px 0; }
+
+        label { display: block; font-size: 11px; margin-bottom: 8px; margin-left: 10px; font-weight: 600; text-transform: uppercase; color: #555; }
+
+        .input-group { display: flex; gap: 10px; margin-bottom: 15px; align-items: center; }
+
+        input, select {
+            font-family: 'Open Sans', sans-serif; font-size: 14px;
+            padding: 12px 15px; border: 1px solid #ccc; border-radius: 25px;
+            background: white; box-sizing: border-box; transition: 0.3s;
+            width: 100%;
+        }
+
+        .fn-input { flex-grow: 1; }
+
+        .color-select {
+            width: 42px; height: 42px; border-radius: 50%;
+            flex-shrink: 0; cursor: pointer; appearance: none;
+            -webkit-appearance: none; border: 2px solid white; padding: 0;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        .botones-container { display: flex; flex-direction: column; gap: 10px; margin-top: 15px; }
+        .boton-estilo {
+            display: flex; align-items: center; justify-content: center;
+            background: white; border: 1px solid #ccc; border-radius: 30px;
+            padding: 14px; cursor: pointer; font-weight: 600; font-size: 13px; transition: 0.3s;
+            text-decoration: none; color: black;
+        }
+        .boton-principal { background: black; color: white; border: none; }
+        
+        #contenedor-grafica {
+            margin-top: 25px; background: white; border-radius: 25px;
+            height: 450px; border: 1px solid #ddd; overflow: hidden;
+            position: relative; cursor: move;
+        }
+
+        #info-box { text-align: center; margin-top: 10px; font-size: 11px; color: #888; }
+
+        /* --- OPTIMIZACIÓN MÓVIL --- */
+        @media (max-width: 600px) {
+            body { padding: 10px; }
+            .calculadora-moderna { padding: 25px 20px; border-radius: 25px; }
+            .header-section h1 { font-size: 26px; }
+            .header-section p { font-size: 16px; }
+            #contenedor-grafica { height: 350px; }
+            input, select { font-size: 16px; } /* Evita zoom automático en móviles */
+            .input-group { gap: 5px; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="fade-in" style="width: 100%; display: flex; justify-content: center;">
+    <div class="calculadora-moderna">
+        <div class="header-section">
+            <h1>Graficadora 3D Sólida</h1>
+            <p>√(Raiz) Cuadrada²</p>
+        </div>
+
+        <label>Ecuación Implícita f(x, y, z) = 0</label>
+        <div class="input-group">
+            <input id="ecuacion" class="fn-input" placeholder="x^2 + y^2 + z^2 - 9" value="x^2 + y^2 + z^2 - 9">
+            <select id="colorSurface" class="color-select" onchange="this.style.backgroundColor = this.value">
+                <option value="#3498db" style="background:#3498db"></option>
+                <option value="#333333" style="background:#333333"></option>
+                <option value="#e74c3c" style="background:#e74c3c"></option>
+                <option value="#2ecc71" style="background:#2ecc71"></option>
+                <option value="#9b59b6" style="background:#9b59b6"></option>
+            </select>
+        </div>
+
+        <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+            <div style="flex: 1;">
+                <label>Rango (Ejes)</label>
+                <input type="number" id="rango" value="5">
+            </div>
+            <div style="flex: 1;">
+                <label>Suavizado (Piel)</label>
+                <select id="resolucion">
+                    <option value="20">Bajo</option>
+                    <option value="32" selected>Normal</option>
+                    <option value="50">Alto (Lento)</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="botones-container">
+            <button onclick="generarSuperficie()" class="boton-estilo boton-principal">Generar Sólido 3D</button>
+            <button onclick="descargarCaptura()" class="boton-estilo">
+                <img src="https://cdn-icons-png.flaticon.com/512/724/724933.png" width="16" style="margin-right:8px"> 
+                Guardar PNG con Marca de Agua
+            </button>
+        </div>
+
+        <div id="contenedor-grafica"></div>
+        <div id="info-box">Girar: 1 dedo | Zoom: Pellizcar | Pan: 2 dedos</div>
+    </div>
+</div>
+
+<canvas id="canvas-export" style="display:none;"></canvas>
+
+<script src="https://cdn.jsdelivr.net/gh/mrdoob/three.js@r128/examples/js/objects/MarchingCubes.js"></script>
+
+<script>
+    // Inicializar color del selector
+    const colorSelect = document.getElementById('colorSurface');
+    colorSelect.style.backgroundColor = colorSelect.value;
+
+    const contenedor = document.getElementById('contenedor-grafica');
+    
+    // Función para obtener la altura actual del contenedor (dependiente de CSS)
+    const getCanvasHeight = () => contenedor.clientHeight;
+
+    // Configuración Base de Three.js
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0xffffff);
+    
+    const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+    renderer.setSize(contenedor.clientWidth, getCanvasHeight());
+    renderer.setPixelRatio(window.devicePixelRatio);
+    contenedor.appendChild(renderer.domElement);
+
+    const camera = new THREE.PerspectiveCamera(45, contenedor.clientWidth / getCanvasHeight(), 0.1, 1000);
+    camera.position.set(10, 10, 10);
+
+    const controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+
+    const light = new THREE.PointLight(0xffffff, 1);
+    light.position.set(10, 10, 10);
+    scene.add(light);
+    scene.add(new THREE.AmbientLight(0xffffff, 0.4));
+
+    const gridHelper = new THREE.GridHelper(20, 20, 0xcccccc, 0xeeeeee);
+    scene.add(gridHelper);
+    const axesHelper = new THREE.AxesHelper(11);
+    scene.add(axesHelper);
+
+    let meshSólido = null;
+
+    async function generarSuperficie() {
+        if (meshSólido) scene.remove(meshSólido);
+
+        const ecuacionStr = document.getElementById('ecuacion').value;
+        const rango = parseFloat(document.getElementById('rango').value);
+        const res = parseInt(document.getElementById('resolucion').value);
+        const colorHex = document.getElementById('colorSurface').value;
+
+        try {
+            const expr = math.compile(ecuacionStr);
+            const material = new THREE.MeshPhongMaterial({ 
+                color: colorHex, 
+                side: THREE.DoubleSide,
+                flatShading: false,
+                shininess: 60
+            });
+
+            const geometry = new THREE.BufferGeometry();
+            const positions = [];
+            const step = (rango * 2) / res;
+
+            for (let x = -rango; x < rango; x += step) {
+                for (let y = -rango; y < rango; y += step) {
+                    for (let z = -rango; z < rango; z += step) {
+                        const v = expr.evaluate({x, y, z});
+                        if (Math.abs(v) < step * 0.7) {
+                            const box = new THREE.BoxGeometry(step, step, step);
+                            positions.push(...box.attributes.position.array.map((p, i) => i%3==0 ? p+x : i%3==1 ? p+y : p+z));
+                        }
+                    }
+                }
+            }
+
+            geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+            geometry.computeVertexNormals();
+
+            meshSólido = new THREE.Mesh(geometry, material);
+            scene.add(meshSólido);
+
+        } catch (e) {
+            alert("Error: Asegúrate de que la ecuación sea válida.");
+        }
+    }
+
+    function descargarCaptura() {
+        const canvas3d = renderer.domElement;
+        const canvasExp = document.getElementById('canvas-export');
+        const ctx = canvasExp.getContext('2d');
+
+        canvasExp.width = canvas3d.width;
+        canvasExp.height = canvas3d.height;
+
+        ctx.fillStyle = "white";
+        ctx.fillRect(0, 0, canvasExp.width, canvasExp.height);
+        ctx.drawImage(canvas3d, 0, 0);
+
+        ctx.font = "bold 26px 'Playfair Display'";
+        ctx.fillStyle = "rgba(0, 0, 0, 0.6)";
+        ctx.textAlign = "right";
+        ctx.fillText("√(Raiz) Cuadrada²", canvasExp.width - 40, canvasExp.height - 40);
+
+        const link = document.createElement('a');
+        link.download = 'Grafica_Solida_RaizCuadrada.png';
+        link.href = canvasExp.toDataURL('image/png');
+        link.click();
+    }
+
+    function animate() {
+        requestAnimationFrame(animate);
+        controls.update();
+        renderer.render(scene, camera);
+    }
+
+    window.addEventListener('resize', () => {
+        const width = contenedor.clientWidth;
+        const height = getCanvasHeight();
+        camera.aspect = width / height;
+        camera.updateProjectionMatrix();
+        renderer.setSize(width, height);
+    });
+
+    generarSuperficie();
+    animate();
+</script>
+
+</body>
+</html>
